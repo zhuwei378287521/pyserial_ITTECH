@@ -5,8 +5,9 @@ import serial
 import serial.tools.list_ports
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, QThread
 from ui_demo_1 import Ui_Form
+from threading import Thread
 
 
 class Pyqt5_Serial(QtWidgets.QWidget, Ui_Form):
@@ -23,6 +24,13 @@ class Pyqt5_Serial(QtWidgets.QWidget, Ui_Form):
         self.lineEdit.setText(str(self.data_num_received))
         self.data_num_sended = 0
         self.lineEdit_2.setText(str(self.data_num_sended))
+        self.threadSend = Thread(target=self.data_send_person,
+                                 args=(['SYSTem:REMote', 'VOLTAGE 0', 'OUTPUT 1', 'VOLTAGE 12', ],))
+        self.threadRece = Thread(target=self.print_receive_data_pop)
+        self.threadSend.setDaemon(True)
+        self.threadRece.setDaemon(True)
+
+        self.receive_data_person = []
 
     def init(self):
         # 串口检测按钮
@@ -121,8 +129,10 @@ class Pyqt5_Serial(QtWidgets.QWidget, Ui_Form):
 
     # 发送数据
     def data_send(self):
+        self.threadSend.start()  # 启动线程
+        self.threadRece.start()
+
         if self.ser.isOpen():
-            '''
             input_s = self.s3__send_text.toPlainText()
             if input_s != "":
                 # 非空字符串               
@@ -142,29 +152,32 @@ class Pyqt5_Serial(QtWidgets.QWidget, Ui_Form):
                 else:
                     # ascii发送
                     input_s = (input_s + '\r\n').encode('utf-8')
-                '''
-            # input_s = ('SYSTem:BEEPer' + '\r\n').encode('utf-8')  # 蜂鸣器
-            # input_s = ('SYSTem:BEEPer'+'\r\n').encode('utf-8') #蜂鸣器
-            # 开启远程
-            # 设置电压为0
-            # 开启输出
-            data_list = ['SYSTem:REMote', 'VOLTAGE 0', 'OUTPUT 1', 'VOLTAGE 12']
-
-            for i in data_list:
-                input_s = (i + '\r\n').encode('utf-8')  # 蜂鸣器
-
-                num = self.ser.write(input_s)
-                self.data_num_sended += num
-                self.lineEdit_2.setText(str(self.data_num_sended))
-
-            #for i in range(0, 1000):
-            input_s = ('MEASure:CURRent?' + '\r\n').encode('utf-8')  # 蜂鸣器
 
             num = self.ser.write(input_s)
             self.data_num_sended += num
             self.lineEdit_2.setText(str(self.data_num_sended))
-            time.sleep(1)
-            print("读取次数"+str(i))
+
+    def data_send_person(self, data_list):
+        # 开启远程
+        # 设置电压为0
+        # 开启输出
+        # data_list = ['SYSTem:REMote', 'VOLTAGE 0', 'OUTPUT 1', 'VOLTAGE 12']
+
+        for i in data_list:
+            input_s = (i + '\r\n').encode('utf-8')  # 蜂鸣器
+
+            num = self.ser.write(input_s)
+            self.data_num_sended += num
+            self.lineEdit_2.setText(str(self.data_num_sended))
+
+        for _ in range(0, 1000000):  # 不停的读取电流值
+            input_s = ('MEASure:CURRent?' + '\r\n').encode('utf-8')
+            num = self.ser.write(input_s)
+            self.data_num_sended += num
+            self.lineEdit_2.setText(str(self.data_num_sended))
+            # time.sleep(1)
+            time.sleep(0.05)
+            print("读取次数" + str(_))
 
     # 接收数据
     def data_receive(self):
@@ -185,6 +198,7 @@ class Pyqt5_Serial(QtWidgets.QWidget, Ui_Form):
             else:
                 # 串口接收到的字符串为b'123',要转化成unicode字符串才能输出到窗口中去
                 self.s2__receive_text.insertPlainText(data.decode('iso-8859-1'))
+                self.receive_data_person.append(data.decode('iso-8859-1'))
 
             # 统计接收字符的数量
             self.data_num_received += num
@@ -214,6 +228,11 @@ class Pyqt5_Serial(QtWidgets.QWidget, Ui_Form):
 
     def receive_data_clear(self):
         self.s2__receive_text.setText("")
+
+    def print_receive_data_pop(self):
+        while True:
+            if self.receive_data_person.__len__() != 0:
+                print(self.receive_data_person.pop())
 
 
 if __name__ == '__main__':
